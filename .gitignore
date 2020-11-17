@@ -1,3 +1,7 @@
+bin/*
+.vscode/*
+.clangd/*
+compile_commands.json
 CMakeLists.txt.user
 CMakeCache.txt
 CMakeFiles
