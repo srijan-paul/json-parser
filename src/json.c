@@ -1,18 +1,9 @@
 #include "json.h"
+#include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-void printValue(JSONValue value) {
-  switch (value.tag) {
-  case JSON_DOUBLE: printf("%f", JSON_AS_DOUBLE(value)); break;
-  case JSON_BOOL: printf("%s", JSON_AS_BOOL(value) ? "true" : "false"); break;
-  case JSON_INTEGER: printf("%d", JSON_AS_INT(value)); break;
-  case JSON_NULL: printf("null");
-  case JSON_STRING: printf("%s", JSON_AS_STRING(value)); break;
-  }
-}
 
 void JSONTokenizerInit(JSONTokenizer* tokenizer, const char* source) {
   tokenizer->source = source;
@@ -55,6 +46,15 @@ static void skipWhiteSpace(JSONTokenizer* tokenizer) {
   }
 }
 
+static bool matchKeyword(JSONTokenizer* tokenizer, const char* kw) {
+  while (isalpha(PEEK)) ADVANCE();
+
+  for (int i = 0; kw[i]; i++) {
+    if (kw[i] != tokenizer->source[tokenizer->lexeme_begin + i]) return false;
+  }
+  return true;
+}
+
 JSONToken JSONScanToken(JSONTokenizer* tokenizer) {
   if (IS_EOF()) {
     tokenizer->eof = true;
@@ -65,39 +65,43 @@ JSONToken JSONScanToken(JSONTokenizer* tokenizer) {
   tokenizer->lexeme_begin = tokenizer->current_pos;
 
   const char c = tokenizer->source[tokenizer->current_pos++];
+  switch (c) {
+  case '{': return TOKEN(LBRAC);
+  case '}': return TOKEN(RBRAC);
+  case '[': return TOKEN(LSQBRACE);
+  case ']': return TOKEN(RSQBRACE);
+  case ':': return TOKEN(COLON);
+  case ',': return TOKEN(COMMA);
+  case 't':
+    if (matchKeyword(tokenizer, "true")) return TOKEN(TRUE);
+    return TOKEN(ERROR);
+  case 'f':
+    if (matchKeyword(tokenizer, "false")) return TOKEN(FALSE);
+    return TOKEN(ERROR);
+  case 'n':
+    if (matchKeyword(tokenizer, "null")) return TOKEN(NULL);
+    return TOKEN(ERROR);
+  default:
+    if (isdigit(c)) { // integer or double
+      JSONTokenType type = JSON_TOKEN_INTEGER;
 
-  if (c == '{') {
-    return TOKEN(LBRAC);
-  } else if (c == '}') {
-    return TOKEN(RBRAC);
-  } else if (c == '[') {
-    return TOKEN(LSQBRACE);
-  } else if (c == ']') {
-    return TOKEN(RSQBRACE);
-  } else if (c == ':') {
-    return TOKEN(COLON);
-  } else if (c == ',') {
-    return TOKEN(COMMA);
-  } else if (isdigit(c)) { // integer or double
-    JSONTokenType type = JSON_TOKEN_INTEGER;
-
-    while (isdigit(PEEK)) ADVANCE();
-
-    if (MATCH('.')) {
-      type = JSON_TOKEN_DOUBLE;
       while (isdigit(PEEK)) ADVANCE();
-    }
-    return makeToken(tokenizer, type);
-  } else if (c == '"') {
-    // TODO: escape chars
-    while (!(IS_EOF() || PEEK == '"')) {
-      ADVANCE();
-    }
-    if (PEEK == '"') ADVANCE();
-    return TOKEN(STRING);
-    // TODO: unterminated string literal error.
-  }
 
+      if (MATCH('.')) {
+        type = JSON_TOKEN_DOUBLE;
+        while (isdigit(PEEK)) ADVANCE();
+      }
+      return makeToken(tokenizer, type);
+    } else if (c == '"') {
+      // TODO: escape chars
+      while (!(IS_EOF() || PEEK == '"')) {
+        ADVANCE();
+      }
+      if (PEEK == '"') ADVANCE();
+      return TOKEN(STRING);
+      // TODO: unterminated string literal error.
+    }
+  }
   return TOKEN(ERROR);
 }
 
@@ -106,7 +110,29 @@ JSONToken JSONScanToken(JSONTokenizer* tokenizer) {
 #undef PEEK
 #undef IS_EOF
 
+// --- JSONValue ---
+
 #define ALLOCATE(type, size) ((type*)(malloc(sizeof(type*) * (size))))
+
+void printValue(JSONValue value) {
+  switch (value.tag) {
+  case JSON_DOUBLE: printf("%f", JSON_AS_DOUBLE(value)); break;
+  case JSON_BOOL: printf("%s", JSON_AS_BOOL(value) ? "true" : "false"); break;
+  case JSON_INTEGER: printf("%d", JSON_AS_INT(value)); break;
+  case JSON_NULL: printf("null");
+  case JSON_STRING: printf("\"%s\"", JSON_AS_STRING(value)); break;
+  case JSON_OBJECT: printf("[JSON Object]"); break;
+  case JSON_ARRAY: {
+    JSONArray* array = JSON_AS_ARRAY(value);
+    printf("[");
+    for (int i = 0; i < array->count; i++) {
+      printValue(array->values[i]);
+      if (i != array->count) printf(", ");
+    }
+    printf("]");
+  }
+  }
+}
 
 static JsonObj* allocateObj() {
   JsonObj* obj = ALLOCATE(JsonObj, 1);
@@ -114,6 +140,54 @@ static JsonObj* allocateObj() {
   obj->prev = NULL;
   return obj;
 }
+
+static void JSONObjFree(JsonObj* obj) {
+  JsonObj* current = obj;
+  while (current != NULL) {
+    freeValue(current->value);
+    current = current->next;
+  }
+}
+
+void JSONArrayInit(JSONArray* array) {
+  array->capacity = JSON_ARRAY_DEFAULT_SIZE;
+  array->count = 0;
+  array->values = ALLOCATE(JSONValue, JSON_ARRAY_DEFAULT_SIZE);
+}
+
+static JSONArray* allocateArray() {
+  JSONArray* array = ALLOCATE(JSONArray, 1);
+  JSONArrayInit(array);
+  return array;
+}
+
+static void ensureCapacity(JSONArray* array) {
+  if (array->count >= array->capacity) {
+    array->capacity *= 2;
+    array->values = realloc(array->values, sizeof(JSONValue) * array->capacity);
+  }
+}
+
+void JSONArrayPush(JSONArray* array, JSONValue value) {
+  ensureCapacity(array);
+  array->values[array->count++] = value;
+}
+
+void JSONArrayFree(JSONArray* array) {
+  free(array->values);
+  array->count = 0;
+  array->capacity = 0;
+}
+
+void freeValue(JSONValue value) {
+  switch (value.tag) {
+  case JSON_ARRAY: JSONArrayFree(JSON_AS_ARRAY(value)); break;
+  case JSON_OBJECT: JSONObjFree(JSON_AS_OBJECT(value)); break;
+  default: break;
+  }
+}
+
+// --- JSONParser ---
 
 void JSONParserInit(JSONParser* parser, const char* source) {
   parser->source = source;
@@ -152,10 +226,14 @@ static bool match(JSONParser* parser, JSONTokenType type) {
 }
 
 static char* parseString(JSONParser* parser) {
-  char* key = (char*)malloc(sizeof(char*) * parser->current.length);
-  memcpy(key, parser->current.start + 1, parser->current.length - 2);
-  return key;
+  char* raw = ALLOCATE(char, parser->current.length - 2);
+  memcpy(raw, parser->current.start + 1, parser->current.length - 2);
+  raw[parser->current.length - 2] = '\0';
+  return raw;
 }
+
+static JSONArray* parseArray(JSONParser* parser);
+static JsonObj* parseObject(JSONParser* parser);
 
 static JSONValue parseValue(JSONParser* parser) {
   advance(parser);
@@ -167,30 +245,33 @@ static JSONValue parseValue(JSONParser* parser) {
     return JSON_NEW_DOUBLE(strtod(raw, NULL));
   }
   case JSON_TOKEN_STRING: return JSON_NEW_STRING(parseString(parser));
+  case JSON_TOKEN_TRUE: return JSON_NEW_BOOL(true);
+  case JSON_TOKEN_FALSE: return JSON_NEW_BOOL(false);
+  case JSON_TOKEN_NULL: return JSON_VAL_NULL;
+  case JSON_TOKEN_LSQBRACE: return JSON_NEW_ARRAY(parseArray(parser));
+  case JSON_TOKEN_LBRAC: return JSON_NEW_OBJECT(parseObject(parser));
   default: error(parser, "unexpected JSON Value."); return JSON_VAL_NULL;
   }
 }
 
 static JsonObj* parseObject(JSONParser* parser) {
-  expect(parser, JSON_TOKEN_LBRAC, "Expected '{'.");
-
   JsonObj* objHead = allocateObj();
+  JsonObj* prev = NULL;
   JsonObj* current = objHead;
+
   while (!parser->tokenizer.eof && !check(parser, JSON_TOKEN_RBRAC)) {
     expect(parser, JSON_TOKEN_STRING, "Expected string literal as object key.");
 
-    char* key = ALLOCATE(char, parser->current.length - 1);
-    memcpy(key, parser->current.start + 1, parser->current.length - 2);
-    key[parser->current.length - 2] = '\0';
-
+    current->key = parseString(parser);
     expect(parser, JSON_TOKEN_COLON, "Expected ':'.");
-
-    current->key = key;
     current->value = parseValue(parser);
 
+    current->prev = prev;
+    prev = current;
     if (check(parser, JSON_TOKEN_RBRAC)) break;
 
     expect(parser, JSON_TOKEN_COMMA, "Expected ',' after key-value pair.");
+
     current->next = allocateObj();
     current = current->next;
   }
@@ -198,8 +279,18 @@ static JsonObj* parseObject(JSONParser* parser) {
   return objHead;
 }
 
-JsonObj* JSONParse(JSONParser* parser) {
-  return parseObject(parser);
+JSONValue JSONParse(JSONParser* parser) {
+  return parseValue(parser);
+}
+
+static JSONArray* parseArray(JSONParser* parser) {
+  JSONArray* array = allocateArray();
+  while (!parser->tokenizer.eof && !check(parser, JSON_TOKEN_RSQBRACE)) {
+    JSONArrayPush(array, parseValue(parser));
+    if (!match(parser, JSON_TOKEN_COMMA)) break;
+  }
+  expect(parser, JSON_TOKEN_RSQBRACE, "Expected ']' at array end.");
+  return array;
 }
 
 /// Tests
@@ -213,7 +304,7 @@ void compare_tokens(const char* code, JSONTokenType* expected, size_t size) {
       printf("Expected Syntax kind %d but got %d", expected[i], token.type);
       break;
     }
-
+    assert(expected[i] == token.type);
     if (t.eof) break;
   }
 }
@@ -224,11 +315,11 @@ void tokenizer_test() {
   compare_tokens("{123.12}", expect, 4);
 
   JSONTokenType s_expected[] = {
-      JSON_TOKEN_LBRAC,  JSON_TOKEN_STRING, JSON_TOKEN_COLON,
-      JSON_TOKEN_DOUBLE, JSON_TOKEN_RBRAC,  JSON_TOKEN_EOF,
+      JSON_TOKEN_LBRAC, JSON_TOKEN_STRING, JSON_TOKEN_COLON,
+      JSON_TOKEN_TRUE,  JSON_TOKEN_RBRAC,  JSON_TOKEN_EOF,
   };
 
-  compare_tokens("{ \"foo\": 12.5 }", s_expected, 6);
+  compare_tokens("{ \"foo\": true }", s_expected, 6);
 }
 
 static void printObject(const JsonObj* const object) {
@@ -244,9 +335,9 @@ static void printObject(const JsonObj* const object) {
 
 static void parser_test() {
   JSONParser parser;
-  JSONParserInit(&parser, "{\"foo\": 123.5, \"bar\": 456.12}");
-  JsonObj* obj = JSONParse(&parser);
-  printObject(obj);
+  JSONParserInit(&parser, "{\"string-key\": \"trueee\"}");
+  JSONValue obj = JSONParse(&parser);
+  printObject(JSON_AS_OBJECT(obj));
 }
 
 int main() {

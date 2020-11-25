@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define JSON_ARRAY_DEFAULT_SIZE 8
+
 typedef enum {
   JSON_INTEGER,
   JSON_DOUBLE,
@@ -31,6 +33,7 @@ struct sJSONValue {
 };
 
 void printValue(JSONValue value);
+void freeValue(JSONValue value);
 
 #define JSON_IS_NUMERIC(o) ((o).tag == JSON_INTEGER || (o).tag == JSON_DOUBLE)
 #define JSON_IS_DOUBLE(o)  ((o).tag == JSON_DOUBLE)
@@ -45,16 +48,26 @@ void printValue(JSONValue value);
 #define JSON_AS_DOUBLE(v) ((v).as.json_double)
 #define JSON_AS_BOOL(v)   ((v).as.boolean)
 #define JSON_AS_STRING(v) ((v).as.string)
+#define JSON_AS_ARRAY(v)  ((v).as.array)
+#define JSON_AS_OBJECT(v) ((v).as.obj)
 
 #define JSON_NEW_INT(n)    ((JSONValue){JSON_INTEGER, {.integer = n}})
 #define JSON_NEW_DOUBLE(n) ((JSONValue){JSON_DOUBLE, {.json_double = n}})
-#define JSON_NEW_STRING(s) ((JSONValue){JSON_INTEGER, {.string = s}})
+#define JSON_NEW_STRING(s) ((JSONValue){JSON_STRING, {.string = s}})
 #define JSON_VAL_NULL      ((JSONValue){JSON_NULL, {.integer = 0}})
+#define JSON_NEW_BOOL(v)   ((JSONValue){JSON_BOOL, {.boolean = v}})
+#define JSON_NEW_OBJECT(v) ((JSONValue){JSON_OBJECT, {.obj = v}})
+#define JSON_NEW_ARRAY(v)  ((JSONValue){JSON_ARRAY, {.array = v}})
 
 struct sJSONArray {
   JSONValue* values;
   size_t count;
+  size_t capacity;
 };
+
+void JSONArrayInit(JSONArray* array);
+void JSONArrayPush(JSONArray* array, JSONValue value);
+void JSONArrayFree(JSONArray* array);
 
 struct sJsonObj {
   JsonObj* next;
@@ -86,6 +99,7 @@ typedef enum {
   JSON_TOKEN_RBRAC,    // }
   JSON_TOKEN_COLON,    // :
   JSON_TOKEN_COMMA,    //,
+  JSON_TOKEN_NULL,     // null
   JSON_TOKEN_EOF,
   JSON_TOKEN_ERROR
 } JSONTokenType;
@@ -107,6 +121,6 @@ typedef struct {
 } JSONParser;
 
 void JSONParserInit(JSONParser* parser, const char* source);
-JsonObj* JSONParse(JSONParser* parser);
+JSONValue JSONParse(JSONParser* parser);
 
 #endif
