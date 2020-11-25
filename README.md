@@ -81,8 +81,8 @@ linked list is a an item containing a `key` and a `value`. A hashtable was avoid
 simple and straightforward.
 
 ```cpp
-struct sJsonObj {
-  JsonObj* next; // next key-value pair in the linked-list
+struct sJSONObject {
+  JsonObj* next;
   JsonObj* prev;
   JSONString key;
   JSONValue value;
@@ -103,3 +103,6 @@ struct sJSONArray {
   size_t capacity; // total capacity of this array.
 };
 ```
+
+The function `JSONArrayPush(JSONArray* array, JSONValue v)` adds values to the array
+and `JSONArrayFree(JSONArray* array)` is used to free the array after use.

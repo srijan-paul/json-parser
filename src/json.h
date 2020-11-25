@@ -15,7 +15,7 @@ typedef enum {
   JSON_NULL
 } JSONValueType;
 
-typedef struct sJsonObj JsonObj;
+typedef struct sJSONObject JSONObject;
 typedef struct sJSONValue JSONValue;
 typedef const char* JSONString;
 typedef struct sJSONArray JSONArray;
@@ -28,7 +28,7 @@ struct sJSONValue {
     double json_double;
     bool boolean;
     JSONArray* array;
-    JsonObj* obj;
+    JSONObject* obj;
   } as;
 };
 
@@ -69,9 +69,9 @@ void JSONArrayInit(JSONArray* array);
 void JSONArrayPush(JSONArray* array, JSONValue value);
 void JSONArrayFree(JSONArray* array);
 
-struct sJsonObj {
-  JsonObj* next;
-  JsonObj* prev;
+struct sJSONObject {
+  JSONObject* next;
+  JSONObject* prev;
   JSONString key;
   JSONValue value;
 };

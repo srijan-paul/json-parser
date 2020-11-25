@@ -133,15 +133,15 @@ void JSONValuePrint(JSONValue value) {
   }
 }
 
-static JsonObj* allocateObj() {
-  JsonObj* obj = ALLOCATE(JsonObj, 1);
+static JSONObject* allocateObj() {
+  JSONObject* obj = ALLOCATE(JSONObject, 1);
   obj->next = NULL;
   obj->prev = NULL;
   return obj;
 }
 
-static void JSONObjFree(JsonObj* obj) {
-  JsonObj* current = obj;
+static void JSONObjectFree(JSONObject* obj) {
+  JSONObject* current = obj;
   while (current != NULL) {
     JSONValueFree(current->value);
     current = current->next;
@@ -181,7 +181,7 @@ void JSONArrayFree(JSONArray* array) {
 void JSONValueFree(JSONValue value) {
   switch (value.tag) {
   case JSON_ARRAY: JSONArrayFree(JSON_AS_ARRAY(value)); break;
-  case JSON_OBJECT: JSONObjFree(JSON_AS_OBJECT(value)); break;
+  case JSON_OBJECT: JSONObjectFree(JSON_AS_OBJECT(value)); break;
   default: break;
   }
 }
@@ -239,7 +239,7 @@ static char* parseString(JSONParser* parser) {
 }
 
 static JSONArray* parseArray(JSONParser* parser);
-static JsonObj* parseObject(JSONParser* parser);
+static JSONObject* parseObject(JSONParser* parser);
 
 static JSONValue parseValue(JSONParser* parser) {
   advance(parser);
@@ -262,10 +262,10 @@ static JSONValue parseValue(JSONParser* parser) {
   }
 }
 
-static JsonObj* parseObject(JSONParser* parser) {
-  JsonObj* objHead = allocateObj();
-  JsonObj* prev = NULL;
-  JsonObj* current = objHead;
+static JSONObject* parseObject(JSONParser* parser) {
+  JSONObject* objHead = allocateObj();
+  JSONObject* prev = NULL;
+  JSONObject* current = objHead;
 
   while (!parser->tokenizer.eof && !check(parser, JSON_TOKEN_RBRAC)) {
     expect(parser, JSON_TOKEN_STRING, "Expected string literal as object key.");

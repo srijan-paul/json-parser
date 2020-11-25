@@ -30,8 +30,8 @@ void tokenizerTest() {
   compare_tokens("{ \"foo\": true }", s_expected, 6);
 }
 
-static void printObject(const JsonObj* const object) {
-  const JsonObj* current = object;
+static void printObject(const JSONObject* const object) {
+  const JSONObject* current = object;
   while (current != NULL) {
     printf("%s", current->key);
     printf(": ");
