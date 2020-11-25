@@ -32,8 +32,8 @@ struct sJSONValue {
   } as;
 };
 
-void printValue(JSONValue value);
-void freeValue(JSONValue value);
+void JSONValuePrint(JSONValue value);
+void JSONValueFree(JSONValue value);
 
 #define JSON_IS_NUMERIC(o) ((o).tag == JSON_INTEGER || (o).tag == JSON_DOUBLE)
 #define JSON_IS_DOUBLE(o)  ((o).tag == JSON_DOUBLE)
@@ -122,5 +122,7 @@ typedef struct {
 
 void JSONParserInit(JSONParser* parser, const char* source);
 JSONValue JSONParse(JSONParser* parser);
+JSONValue JSONParseString(const char* source);
+JSONValue JSONParseFile(const char* fileName);
 
 #endif

@@ -1,5 +1,4 @@
 #include "json.h"
-#include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,7 +113,7 @@ JSONToken JSONScanToken(JSONTokenizer* tokenizer) {
 
 #define ALLOCATE(type, size) ((type*)(malloc(sizeof(type*) * (size))))
 
-void printValue(JSONValue value) {
+void JSONValuePrint(JSONValue value) {
   switch (value.tag) {
   case JSON_DOUBLE: printf("%f", JSON_AS_DOUBLE(value)); break;
   case JSON_BOOL: printf("%s", JSON_AS_BOOL(value) ? "true" : "false"); break;
@@ -126,7 +125,7 @@ void printValue(JSONValue value) {
     JSONArray* array = JSON_AS_ARRAY(value);
     printf("[");
     for (int i = 0; i < array->count; i++) {
-      printValue(array->values[i]);
+      JSONValuePrint(array->values[i]);
       if (i != array->count) printf(", ");
     }
     printf("]");
@@ -144,7 +143,7 @@ static JsonObj* allocateObj() {
 static void JSONObjFree(JsonObj* obj) {
   JsonObj* current = obj;
   while (current != NULL) {
-    freeValue(current->value);
+    JSONValueFree(current->value);
     current = current->next;
   }
 }
@@ -179,7 +178,7 @@ void JSONArrayFree(JSONArray* array) {
   array->capacity = 0;
 }
 
-void freeValue(JSONValue value) {
+void JSONValueFree(JSONValue value) {
   switch (value.tag) {
   case JSON_ARRAY: JSONArrayFree(JSON_AS_ARRAY(value)); break;
   case JSON_OBJECT: JSONObjFree(JSON_AS_OBJECT(value)); break;
@@ -225,6 +224,13 @@ static bool match(JSONParser* parser, JSONTokenType type) {
   return false;
 }
 
+static char* tok2String(JSONParser* parser) {
+  char* raw = ALLOCATE(char, parser->current.length + 1);
+  raw[parser->current.length] = '\0';
+  memcpy(raw, parser->current.start, parser->current.length);
+  return raw;
+}
+
 static char* parseString(JSONParser* parser) {
   char* raw = ALLOCATE(char, parser->current.length - 2);
   memcpy(raw, parser->current.start + 1, parser->current.length - 2);
@@ -239,10 +245,12 @@ static JSONValue parseValue(JSONParser* parser) {
   advance(parser);
   switch (parser->current.type) {
   case JSON_TOKEN_DOUBLE: {
-    char* raw = ALLOCATE(char, parser->current.length + 1);
-    raw[parser->current.length] = '\0';
-    memcpy(raw, parser->current.start, parser->current.length);
+    char* raw = tok2String(parser);
     return JSON_NEW_DOUBLE(strtod(raw, NULL));
+  }
+  case JSON_TOKEN_INTEGER: {
+    char* raw = tok2String(parser);
+    return JSON_NEW_INT(strtol(raw, NULL, 10));
   }
   case JSON_TOKEN_STRING: return JSON_NEW_STRING(parseString(parser));
   case JSON_TOKEN_TRUE: return JSON_NEW_BOOL(true);
@@ -279,10 +287,6 @@ static JsonObj* parseObject(JSONParser* parser) {
   return objHead;
 }
 
-JSONValue JSONParse(JSONParser* parser) {
-  return parseValue(parser);
-}
-
 static JSONArray* parseArray(JSONParser* parser) {
   JSONArray* array = allocateArray();
   while (!parser->tokenizer.eof && !check(parser, JSON_TOKEN_RSQBRACE)) {
@@ -293,55 +297,12 @@ static JSONArray* parseArray(JSONParser* parser) {
   return array;
 }
 
-/// Tests
-void compare_tokens(const char* code, JSONTokenType* expected, size_t size) {
-  JSONTokenizer t;
-  JSONTokenizerInit(&t, code);
-
-  for (int i = 0; i < size; i++) {
-    JSONToken token = JSONScanToken(&t);
-    if (expected[i] != token.type) {
-      printf("Expected Syntax kind %d but got %d", expected[i], token.type);
-      break;
-    }
-    assert(expected[i] == token.type);
-    if (t.eof) break;
-  }
+JSONValue JSONParse(JSONParser* parser) {
+  return parseValue(parser);
 }
 
-void tokenizer_test() {
-  JSONTokenType expect[] = {JSON_TOKEN_LBRAC, JSON_TOKEN_DOUBLE,
-                            JSON_TOKEN_RBRAC, JSON_TOKEN_EOF};
-  compare_tokens("{123.12}", expect, 4);
-
-  JSONTokenType s_expected[] = {
-      JSON_TOKEN_LBRAC, JSON_TOKEN_STRING, JSON_TOKEN_COLON,
-      JSON_TOKEN_TRUE,  JSON_TOKEN_RBRAC,  JSON_TOKEN_EOF,
-  };
-
-  compare_tokens("{ \"foo\": true }", s_expected, 6);
-}
-
-static void printObject(const JsonObj* const object) {
-  const JsonObj* current = object;
-  while (current != NULL) {
-    printf("%s", current->key);
-    printf(": ");
-    printValue(current->value);
-    printf(", \n");
-    current = current->next;
-  }
-}
-
-static void parser_test() {
+JSONValue JSONParseString(const char* source) {
   JSONParser parser;
-  JSONParserInit(&parser, "{\"string-key\": \"trueee\"}");
-  JSONValue obj = JSONParse(&parser);
-  printObject(JSON_AS_OBJECT(obj));
-}
-
-int main() {
-  tokenizer_test();
-  parser_test();
-  return 0;
+  JSONParserInit(&parser, source);
+  return JSONParse(&parser);
 }
