@@ -126,7 +126,7 @@ void JSONValuePrint(JSONValue value) {
     printf("[");
     for (int i = 0; i < array->count; i++) {
       JSONValuePrint(array->values[i]);
-      if (i != array->count) printf(", ");
+      if (i < array->count - 1) printf(", ");
     }
     printf("]");
   }
@@ -305,4 +305,37 @@ JSONValue JSONParseString(const char* source) {
   JSONParser parser;
   JSONParserInit(&parser, source);
   return JSONParse(&parser);
+}
+
+static const char* readFile(const char* fileName) {
+  FILE* file;
+  fopen_s(&file, fileName, "r");
+
+  if (file == NULL) {
+    printf("JSONC: File '%s' not found.\n", fileName);
+    return NULL;
+  }
+
+  fseek(file, 0, SEEK_END);
+  size_t fileSize = ftell(file);
+  rewind(file);
+
+  char* buf = ALLOCATE(char, fileSize + 1);
+
+  if (buf == NULL) {
+    printf("JSONC: Not enough memory to read file '%s'.\n", fileName);
+    return NULL;
+  }
+
+  size_t bytesRead = fread(buf, sizeof(char), fileSize, file);
+  buf[bytesRead] = '\0';
+
+  fclose(file);
+  return buf;
+}
+
+JSONValue JSONParseFile(const char* fileName) {
+  const char* source = readFile(fileName);
+  if (source == NULL) return JSON_VAL_NULL;
+  return JSONParseString(source);
 }

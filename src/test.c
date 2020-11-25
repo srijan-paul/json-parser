@@ -22,12 +22,12 @@ void tokenizerTest() {
                             JSON_TOKEN_RBRAC, JSON_TOKEN_EOF};
   compare_tokens("{123.12}", expect, 4);
 
-  JSONTokenType s_expected[] = {
+  JSONTokenType sExpected[] = {
       JSON_TOKEN_LBRAC, JSON_TOKEN_STRING, JSON_TOKEN_COLON,
       JSON_TOKEN_TRUE,  JSON_TOKEN_RBRAC,  JSON_TOKEN_EOF,
   };
 
-  compare_tokens("{ \"foo\": true }", s_expected, 6);
+  compare_tokens("{ \"foo\": true }", sExpected, 6);
 }
 
 static void printObject(const JSONObject* const object) {
@@ -42,8 +42,14 @@ static void printObject(const JSONObject* const object) {
 }
 
 static void parserTest() {
-  JSONValue obj = JSONParseString("true");
-  printObject(JSON_AS_OBJECT(obj));
+  JSONValue test = JSONParseFile("../test/1.json");
+  printObject(JSON_AS_OBJECT(test));
+  JSONValueFree(test);
+
+  JSONValue obj = JSONParseString(
+      "[1, [1, 2, \"Actually a string\"], {\"key\": [1, true]}]");
+  JSONValuePrint(obj);
+  JSONValueFree(obj);
 }
 
 int main() {
