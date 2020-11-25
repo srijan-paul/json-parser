@@ -118,7 +118,7 @@ void JSONValuePrint(JSONValue value) {
   case JSON_DOUBLE: printf("%f", JSON_AS_DOUBLE(value)); break;
   case JSON_BOOL: printf("%s", JSON_AS_BOOL(value) ? "true" : "false"); break;
   case JSON_INTEGER: printf("%d", JSON_AS_INT(value)); break;
-  case JSON_NULL: printf("null");
+  case JSON_NULL: printf("null"); break;
   case JSON_STRING: printf("\"%s\"", JSON_AS_STRING(value)); break;
   case JSON_OBJECT: printf("[JSON Object]"); break;
   case JSON_ARRAY: {
@@ -129,7 +129,7 @@ void JSONValuePrint(JSONValue value) {
       if (i < array->count - 1) printf(", ");
     }
     printf("]");
-  }
+  } break;
   }
 }
 
