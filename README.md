@@ -24,7 +24,7 @@ To run compile and run the project, simply invoke the build script. In this case
 Here is a simple C program to parse a JSON string representing an array:
 
 ```cpp
-#include <json.h>
+#include "json.h"
 
 int main() {
     JSONValue v = JSONParseString("[1, true, false, null, 45, {\"foo\": 12.3}]");
