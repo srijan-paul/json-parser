@@ -189,16 +189,6 @@ void JSONValueFree(JSONValue value) {
   }
 }
 
-// --- JSONStatus ---
-
-void JSONStatusFree(JSONStatus* status) {
-  free(status->message);
-}
-
-JSONStatus JSONStatusNew(JSONCode code, char* message) {
-  return (JSONStatus){code, message};
-}
-
 // --- JSONParser ---
 
 void JSONParserInit(JSONParser* parser, const char* source) {
@@ -209,14 +199,8 @@ void JSONParserInit(JSONParser* parser, const char* source) {
   parser->errMsg = NULL;
 }
 
-static void error(JSONParser* parser, const char* message) {
-  size_t line = parser->tokenizer.line;
+static void error(JSONParser* parser) {
   parser->hasError = true;
-  size_t len = (int)log10(line);
-  len += strlen(message);
-  char* errMessage = ALLOCATE(char, len);
-  sprintf(errMessage, "Syntax error at line %zu: %s.", line, message);
-  parser->errMsg = errMessage;
 }
 
 static void advance(JSONParser* parser) {
@@ -228,12 +212,12 @@ static inline bool check(JSONParser* parser, JSONTokenType type) {
   return (parser->lookahead.type == type);
 }
 
-static bool expect(JSONParser* parser, JSONTokenType type, const char* errMsg) {
+static bool expect(JSONParser* parser, JSONTokenType type) {
   if (parser->lookahead.type == type) {
     advance(parser);
     return true;
   }
-  error(parser, errMsg);
+  error(parser);
   return false;
 }
 
@@ -279,7 +263,7 @@ static JSONValue parseValue(JSONParser* parser) {
   case JSON_TOKEN_NULL: return JSON_VAL_NULL;
   case JSON_TOKEN_LSQBRACE: return JSON_NEW_ARRAY(parseArray(parser));
   case JSON_TOKEN_LBRAC: return JSON_NEW_OBJECT(parseObject(parser));
-  default: error(parser, "unexpected JSON Value."); return JSON_VAL_NULL;
+  default: error(parser); return JSON_VAL_NULL;
   }
 }
 
@@ -289,22 +273,22 @@ static JSONObject* parseObject(JSONParser* parser) {
   JSONObject* current = objHead;
 
   while (!parser->tokenizer.eof && !check(parser, JSON_TOKEN_RBRAC)) {
-    expect(parser, JSON_TOKEN_STRING, "Expected string literal as object key.");
+    expect(parser, JSON_TOKEN_STRING);
 
     current->key = parseString(parser);
-    expect(parser, JSON_TOKEN_COLON, "Expected ':'.");
+    expect(parser, JSON_TOKEN_COLON);
     current->value = parseValue(parser);
 
     current->prev = prev;
     prev = current;
     if (check(parser, JSON_TOKEN_RBRAC)) break;
 
-    expect(parser, JSON_TOKEN_COMMA, "Expected ',' after key-value pair.");
+    expect(parser, JSON_TOKEN_COMMA);
 
     current->next = allocateObj();
     current = current->next;
   }
-  expect(parser, JSON_TOKEN_RBRAC, "Expected '}' for closing object literal");
+  expect(parser, JSON_TOKEN_RBRAC);
   return objHead;
 }
 
@@ -314,21 +298,21 @@ static JSONArray* parseArray(JSONParser* parser) {
     JSONArrayPush(array, parseValue(parser));
     if (!match(parser, JSON_TOKEN_COMMA)) break;
   }
-  expect(parser, JSON_TOKEN_RSQBRACE, "Expected ']' at array end.");
+  expect(parser, JSON_TOKEN_RSQBRACE);
   return array;
 }
 
-JSONStatus JSONParse(JSONParser* parser, JSONValue* value) {
+JSONCode JSONParse(JSONParser* parser, JSONValue* value) {
   *value = parseValue(parser);
 
   if (parser->hasError) {
-    return JSON_MAKE_STATUS(JSON_ERROR_SYNTAX, parser->errMsg);
+    return JSON_ERROR_SYNTAX;
   }
 
-  return JSON_MAKE_STATUS(JSON_SUCCESS, "No errors.");
+  return JSON_ERROR_NONE;
 }
 
-JSONStatus JSONParseString(const char* source, JSONValue* value) {
+JSONCode JSONParseString(const char* source, JSONValue* value) {
   JSONParser parser;
   JSONParserInit(&parser, source);
   return JSONParse(&parser, value);
@@ -361,10 +345,10 @@ static const char* readFile(const char* fileName) {
   return buf;
 }
 
-JSONStatus JSONParseFile(const char* fileName, JSONValue* value) {
+JSONCode JSONParseFile(const char* fileName, JSONValue* value) {
   const char* source = readFile(fileName);
   if (source == NULL) {
-    return JSON_MAKE_STATUS(JSON_ERROR_FILE_READ, "error reading file.");
+    return JSON_ERROR_FILE_READ;
   }
   return JSONParseString(source, value);
 }

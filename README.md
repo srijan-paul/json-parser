@@ -28,8 +28,8 @@ Here is a simple C program to parse a JSON string representing an array:
 
 int main() {
     JSONValue v;
-    JSONStatus status = JSONParseString("[1, true, false, null, 45, {\"foo\": 12.3}]", &v);
-    if (status.code == JSON_SUCCESS) // only print the value if there are no syntax errors.
+    JSONCode code = JSONParseString("[1, true, false, null, 45, {\"foo\": 12.3}]", &v);
+    if (code == JSON_ERROR_NONE) // only print the value if there are no syntax errors.
       JSONValuePrint(v); // [1, true, false, null, 45, [JSON Object]]
     return 0;
 }
@@ -40,13 +40,13 @@ Parsing JSON files is just as easy:
 
 ```cpp
 JSONValue myData; // The parsed JSONValue is put inside this variable
-JSONStatus status = JSONParseFile("path/to/file.json", &myData);
+JSONCode code = JSONParseFile("path/to/file.json", &myData);
 
-if (status.code == JSON_SUCCESS) {
+if (status == JSON_ERROR_NONE) {
   printf("The parsed data is: \n");
   JSONValuePrint(myData);
 } else { // in case an error occurs.
-  printf("Error: %s.\n", status.message);
+  printf("Error parsing json.\n");
 }
 ```
 

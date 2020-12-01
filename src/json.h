@@ -116,17 +116,8 @@ void JSONTokenizerInit(JSONTokenizer* tokenizer, const char* source);
 typedef enum {
   JSON_ERROR_SYNTAX,
   JSON_ERROR_FILE_READ,
-  JSON_SUCCESS,
+  JSON_ERROR_NONE,
 } JSONCode;
-
-typedef struct {
-  JSONCode code;
-  char* message;
-} JSONStatus;
-
-#define JSON_MAKE_STATUS(type, message) ((JSONStatus){type, message})
-JSONStatus JSONStatusNew(JSONCode code, char* message);
-void JSONStatusFree(JSONStatus* status);
 
 typedef struct {
   const char* source;
@@ -138,8 +129,8 @@ typedef struct {
 } JSONParser;
 
 void JSONParserInit(JSONParser* parser, const char* source);
-JSONStatus JSONParse(JSONParser* parser, JSONValue* value);
-JSONStatus JSONParseString(const char* source, JSONValue* value);
-JSONStatus JSONParseFile(const char* fileName, JSONValue* value);
+JSONCode JSONParse(JSONParser* parser, JSONValue* value);
+JSONCode JSONParseString(const char* source, JSONValue* value);
+JSONCode JSONParseFile(const char* fileName, JSONValue* value);
 
 #endif

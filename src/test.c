@@ -46,13 +46,12 @@ static void parserTest() {
 
   JSONValue test;
   const char* filename = "../test/1.json";
-  JSONStatus status = JSONParseFile(filename, &test);
-  if (status.code == JSON_SUCCESS) {
+  JSONCode status = JSONParseFile(filename, &test);
+
+  if (status == JSON_ERROR_NONE) {
     printObject(JSON_AS_OBJECT(test));
     JSONValueFree(test);
     printf("\n");
-  } else {
-    printf("Error on file test '%s': %s\n", filename, status.message);
   }
 
   JSONValue strtest;
@@ -85,8 +84,7 @@ void errorTest() {
   printf("--- Error and status test ---\n");
   const char* str = "{\"key\": 1";
   JSONValue v;
-  JSONStatus status = JSONParseString(str, &v);
-  printf("%s", status.message);
+  JSONCode status = JSONParseString(str, &v);
   printf("\n-----------------------------\n");
 }
 
