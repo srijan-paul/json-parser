@@ -42,18 +42,58 @@ static void printObject(const JSONObject* const object) {
 }
 
 static void parserTest() {
-  JSONValue test = JSONParseFile("../test/1.json");
-  printObject(JSON_AS_OBJECT(test));
-  JSONValueFree(test);
+  printf("--- Parser tests ---\n");
 
-  JSONValue obj = JSONParseString(
-      "[1, [1, 2, \"Actually a string\"], {\"key\": [1, true]}]");
-  JSONValuePrint(obj);
-  JSONValueFree(obj);
+  JSONValue test;
+  const char* filename = "../test/1.json";
+  JSONStatus status = JSONParseFile(filename, &test);
+  if (status.code == JSON_SUCCESS) {
+    printObject(JSON_AS_OBJECT(test));
+    JSONValueFree(test);
+    printf("\n");
+  } else {
+    printf("Error on file test '%s': %s\n", filename, status.message);
+  }
+
+  JSONValue strtest;
+  status = JSONParseString(
+      "[1, [1, 2, \"Actually a string\"], {\"key\": [1, true]}]", &strtest);
+  JSONValuePrint(strtest);
+  printf("\n");
+  JSONValueFree(strtest);
+
+  printf("\n------------------\n");
+}
+
+static void arrayTest() {
+  printf("--- Array tests ---\n");
+
+  JSONArray array;
+  JSONArrayInit(&array);
+  JSONArrayPush(&array, JSON_NEW_BOOL(true));
+  JSONArrayPush(&array, JSON_NEW_DOUBLE(13.5));
+  for (int i = 0; i < 8; i++) {
+    JSONArrayPush(&array, JSON_NEW_INT(i));
+  }
+  JSONValuePrint(JSON_NEW_ARRAY(&array));
+  JSONValueFree(JSON_NEW_ARRAY(&array));
+
+  printf("\n------------------\n");
+}
+
+void errorTest() {
+  printf("--- Error and status test ---\n");
+  const char* str = "{\"key\": 1";
+  JSONValue v;
+  JSONStatus status = JSONParseString(str, &v);
+  printf("%s", status.message);
+  printf("\n-----------------------------\n");
 }
 
 int main() {
+  arrayTest();
   tokenizerTest();
   parserTest();
+  errorTest();
   return 0;
 }

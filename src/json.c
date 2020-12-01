@@ -1,5 +1,6 @@
 #include "json.h"
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -111,7 +112,9 @@ JSONToken JSONScanToken(JSONTokenizer* tokenizer) {
 
 // --- JSONValue ---
 
-#define ALLOCATE(type, size) ((type*)(malloc(sizeof(type*) * (size))))
+#define ALLOCATE(type, count) ((type*)(malloc(sizeof(type) * (count))))
+#define REALLOC(block, type, count)                                            \
+  ((type*)realloc(block, sizeof(type) * count))
 
 void JSONValuePrint(JSONValue value) {
   switch (value.tag) {
@@ -163,7 +166,7 @@ static JSONArray* allocateArray() {
 static void ensureCapacity(JSONArray* array) {
   if (array->count >= array->capacity) {
     array->capacity *= 2;
-    array->values = realloc(array->values, sizeof(JSONValue) * array->capacity);
+    array->values = REALLOC(array->values, JSONValue, array->capacity);
   }
 }
 
@@ -186,16 +189,34 @@ void JSONValueFree(JSONValue value) {
   }
 }
 
+// --- JSONStatus ---
+
+void JSONStatusFree(JSONStatus* status) {
+  free(status->message);
+}
+
+JSONStatus JSONStatusNew(JSONCode code, char* message) {
+  return (JSONStatus){code, message};
+}
+
 // --- JSONParser ---
 
 void JSONParserInit(JSONParser* parser, const char* source) {
   parser->source = source;
   JSONTokenizerInit(&parser->tokenizer, source);
   parser->lookahead = JSONScanToken(&parser->tokenizer);
+  parser->hasError = false;
+  parser->errMsg = NULL;
 }
 
 static void error(JSONParser* parser, const char* message) {
-  printf("Error at line %zu: %s\n", parser->tokenizer.line, message);
+  size_t line = parser->tokenizer.line;
+  parser->hasError = true;
+  size_t len = (int)log10(line);
+  len += strlen(message);
+  char* errMessage = ALLOCATE(char, len);
+  sprintf(errMessage, "Syntax error at line %zu: %s.", line, message);
+  parser->errMsg = errMessage;
 }
 
 static void advance(JSONParser* parser) {
@@ -297,14 +318,20 @@ static JSONArray* parseArray(JSONParser* parser) {
   return array;
 }
 
-JSONValue JSONParse(JSONParser* parser) {
-  return parseValue(parser);
+JSONStatus JSONParse(JSONParser* parser, JSONValue* value) {
+  *value = parseValue(parser);
+
+  if (parser->hasError) {
+    return JSON_MAKE_STATUS(JSON_ERROR_SYNTAX, parser->errMsg);
+  }
+
+  return JSON_MAKE_STATUS(JSON_SUCCESS, "No errors.");
 }
 
-JSONValue JSONParseString(const char* source) {
+JSONStatus JSONParseString(const char* source, JSONValue* value) {
   JSONParser parser;
   JSONParserInit(&parser, source);
-  return JSONParse(&parser);
+  return JSONParse(&parser, value);
 }
 
 static const char* readFile(const char* fileName) {
@@ -334,8 +361,10 @@ static const char* readFile(const char* fileName) {
   return buf;
 }
 
-JSONValue JSONParseFile(const char* fileName) {
+JSONStatus JSONParseFile(const char* fileName, JSONValue* value) {
   const char* source = readFile(fileName);
-  if (source == NULL) return JSON_VAL_NULL;
-  return JSONParseString(source);
+  if (source == NULL) {
+    return JSON_MAKE_STATUS(JSON_ERROR_FILE_READ, "error reading file.");
+  }
+  return JSONParseString(source, value);
 }

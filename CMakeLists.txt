@@ -5,3 +5,4 @@ set(SOURCE_DIR "src")
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
 
 add_executable(${PROJECT_NAME} ${SOURCES})
+add_definitions(-lm)
