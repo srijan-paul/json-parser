@@ -12,7 +12,7 @@ The build script and compiler I used are `ninja` and `clang`, but you can use an
 ```
 mkdir bin
 cd bin
-cmake -G Ninja -DCMAKE_C_COMPILER=clang
+cmake -G Ninja .. -DCMAKE_C_COMPILER=clang
 ```
 
 That will generate the build files in the newly created `bin` directory.
